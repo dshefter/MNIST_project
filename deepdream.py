@@ -15,7 +15,7 @@ BATCH_SZ = 32
 N_OUT = 10
 N_HID = 128
 N_IN = 784
-N_STEPS = 50000
+N_STEPS = 500000
 
 
 def load_mnist(imagefile, labelfile, count):
@@ -94,7 +94,9 @@ if __name__ == '__main__':
         if count >=  9:
             break
 
-    x_init = np.array(x_init).astype(np.float32)
+    x_init = np.array(x_init)
+    x_init += np.random.uniform(-0.05, 0.05, size=(9, N_IN))
+    x_init = np.clip(x_init, 0, 1).astype(np.float32)
     # x_init = np.random.uniform(low=0.0, high=1.0, size=(9, N_IN)).astype(np.float32)
     dd_x = tf.get_variable('input', initializer=x_init)
     dd_h_ = tf.nn.sigmoid(tf.nn.xw_plus_b(dd_x, W1_, b1_))
