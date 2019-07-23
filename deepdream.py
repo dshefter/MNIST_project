@@ -15,7 +15,7 @@ BATCH_SZ = 32
 N_OUT = 10
 N_HID = 128
 N_IN = 784
-N_STEPS = 100000
+N_STEPS = 50000
 
 
 def load_mnist(imagefile, labelfile, count):
@@ -62,6 +62,14 @@ def layer(input_, n_in, n_out, name,
 
 # ---------------------------------------------------------------------
 if __name__ == '__main__':
+    # ---------------------------- data -------------------------------
+    train_images, train_labels = load_mnist('fashionmnist/train-images-idx3-ubyte',
+                                            'fashionmnist/train-labels-idx1-ubyte',
+                                            60000)
+    test_images, test_labels = load_mnist('fashionmnist/t10k-images-idx3-ubyte',
+                                          'fashionmnist/t10k-labels-idx1-ubyte',
+                                          10000)
+
     # ------------------------- set up model --------------------------
     x = tf.placeholder(tf.float32, shape=(BATCH_SZ, N_IN), name='x')
     h_, W1_, b1_ = layer(x, N_IN, N_HID, 'layer1')
@@ -75,21 +83,28 @@ if __name__ == '__main__':
     train_op = opt.minimize(loss_)
 
     # --------------------------- deep dream --------------------------
-    x_init = np.random.uniform(low=0.0, high=1.0, size=(9, N_IN)).astype(np.float32)
+    out_class_to_dream = 5
+
+    x_init = []
+    count = 0
+    for im, lab in zip(train_images, train_labels):
+        if lab == out_class_to_dream:
+            x_init.append(im)
+            count += 1
+        if count >=  9:
+            break
+
+    x_init = np.array(x_init).astype(np.float32)
+    # x_init = np.random.uniform(low=0.0, high=1.0, size=(9, N_IN)).astype(np.float32)
     dd_x = tf.get_variable('input', initializer=x_init)
     dd_h_ = tf.nn.sigmoid(tf.nn.xw_plus_b(dd_x, W1_, b1_))
     dd_z_ = tf.nn.sigmoid(tf.nn.xw_plus_b(dd_h_, W2_, b2_))
 
-    R = tf.reduce_sum(dd_z_[:, 0])
+    R = tf.reduce_sum(dd_z_[:, out_class_to_dream])
+    for i in range(9):
+        if i != out_class_to_dream:
+            R = R - tf.reduce_sum(dd_z_[:, i])
     max_op_ = tf.train.GradientDescentOptimizer(0.01).minimize(-R, var_list=[dd_x])
-
-    # ---------------------------- data -------------------------------
-    train_images, train_labels = load_mnist('fashionmnist/train-images-idx3-ubyte',
-                                            'fashionmnist/train-labels-idx1-ubyte',
-                                            60000)
-    test_images, test_labels = load_mnist('fashionmnist/t10k-images-idx3-ubyte',
-                                          'fashionmnist/t10k-labels-idx1-ubyte',
-                                          10000)
 
     # ------------------------- testing ops ---------------------------
     test_X_ = tf.constant(np.array(test_images))
@@ -141,10 +156,9 @@ if __name__ == '__main__':
 
         for i in range(N_STEPS):
             sess.run(max_op_)
-            if not i % 5000:
-                dd_result = sess.run(dd_x)
-                print(dd_result)
-                fig, axes = plt.subplots(3, 3, squeeze=False)
-                for x, ax in zip(dd_result, axes.flat):
-                    ax.imshow(x.reshape(28, 28), cmap='gray')
-                plt.show()
+        dd_result = sess.run(dd_x)
+        print(dd_result)
+        fig, axes = plt.subplots(3, 3, squeeze=False)
+        for x, ax in zip(dd_result, axes.flat):
+            ax.imshow(x.reshape(28, 28), cmap='gray')
+        plt.show()
